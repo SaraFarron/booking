@@ -5,18 +5,18 @@ from sqlalchemy.orm import relationship
 Base = declarative_base()
 
 
-class Model(Base):
+class Model:
     id = Column(Integer, primary_key=True, autoincrement=True)
 
 
-class Executor(Model):
+class Executor(Model, Base):
     __tablename__ = 'executors'
     user = relationship('User', backref='executor')
     jobs = relationship('Event', back_populates='executor')
     recurrent_jobs = relationship('RecurrentEvent', back_populates='executor')
 
 
-class User(Model):
+class User(Model, Base):
     __tablename__ = 'users'
     name = Column(String)
     role = Column(String)
@@ -26,7 +26,7 @@ class User(Model):
     executor_id = Column(Integer, ForeignKey('executors.id'), nullable=True, default=None)
 
 
-class Event(Model):
+class Event(Model, Base):
     __tablename__ = 'events'
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship(User, back_populates='events')
@@ -43,7 +43,7 @@ class Event(Model):
     is_rescheduled = Column(Boolean, default=False)
 
 
-class RecurrentEvent(Model):
+class RecurrentEvent(Model, Base):
     __tablename__ = 'recurrent_events'
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship(User, back_populates='recurrent_events')
@@ -53,10 +53,10 @@ class RecurrentEvent(Model):
     event = relationship(Event)
     interval = Column(Integer)
     start = Column(DateTime)
-    end = Column(DateTime)
+    end = Column(DateTime, nullable=True)
 
 
-class EventBreak(Model):
+class EventBreak(Model, Base):
     __tablename__ = 'event_breaks'
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship(User, back_populates='event_breaks')

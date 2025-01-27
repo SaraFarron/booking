@@ -1,6 +1,8 @@
-from models import Event, User, RecurrentEvent, EventBreak, Base, Executor
-from sqlalchemy.orm import Session
 from datetime import datetime, date, time, timedelta
+
+from sqlalchemy.orm import Session
+
+from models import Event, User, RecurrentEvent, EventBreak, Base, Executor
 
 
 class Repository:
@@ -28,6 +30,15 @@ class Repository:
 class UserRepo(Repository):
     def __init__(self, db: Session):
         super().__init__(db, User)
+
+    def new(self, name: str, role: str, is_exec: bool = False):
+        user = User(name=name, role=role)
+        if is_exec:
+            executor = Executor()
+            self.db.add(executor)
+            user.executor_id = executor
+        self.db.add(user)
+        return user
 
 
 class EventRepo(Repository):
@@ -62,7 +73,7 @@ class RecurrentEventRepo(Repository):
         day: date,
         interval: timedelta,
         start: datetime,
-        end: datetime
+        end: datetime | None = None
     ):
         event = EventRepo(self.db).new(user, executor, event_type, start_time, end_time, day)
         recurrent_event = RecurrentEvent(
@@ -80,3 +91,8 @@ class RecurrentEventRepo(Repository):
 class EventBreakRepo(Repository):
     def __init__(self, db: Session):
         super().__init__(db, EventBreak)
+
+    def new(self, user: User, break_type: str, start: datetime, end: datetime):
+        event_break = EventBreak(user_id=user.id, break_type=break_type, start=start, end=end)
+        self.db.add(event_break)
+        return event_break
