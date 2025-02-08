@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Time, Boolean, Date, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declarative_base
+from datetime import datetime, timedelta
 
 Base = declarative_base()
 
@@ -54,6 +54,21 @@ class RecurrentEvent(Model, Base):
     interval = Column(Integer)
     start = Column(DateTime)
     end = Column(DateTime, nullable=True)
+
+    def get_next_occurrence(self, after: datetime, before: datetime | None = None):
+        """
+        Given an Event and a datetime, return the next occurrence of the event after the given datetime.
+        """
+        if after < self.start:
+            return None
+
+        elapsed_time = (after - self.start).total_seconds()
+        intervals_passed = (elapsed_time // self.interval) + 1
+        occur = self.start + timedelta(seconds=intervals_passed * self.interval)
+        if before and occur > before:
+            return None
+        return occur
+
 
 
 class EventBreak(Model, Base):
