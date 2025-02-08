@@ -41,6 +41,11 @@ class UserRepo(Repository):
         return user
 
 
+class ExecutorRepo(Repository):
+    def __init__(self, db: Session):
+        super().__init__(db, Executor)
+
+
 class EventRepo(Repository):
     def __init__(self, db: Session):
         super().__init__(db, Event)
