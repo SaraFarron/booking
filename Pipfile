@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 sqlalchemy = "*"
 loguru = "*"
+pytest = "*"
+pytest-sqlalchemy = "*"
 
 [dev-packages]
 

@@ -10,6 +10,8 @@
 
 debug/
 
+*.sqlite
+
 test.py
 
 # IDE
@@ -72,7 +74,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-# Pipfile.lock
+Pipfile.lock
 
 # Scrapy stuff:
 .scrapy
