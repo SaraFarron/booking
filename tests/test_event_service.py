@@ -2,7 +2,8 @@ from datetime import datetime, date, time, timedelta
 
 import pytest
 
-from src.models import User, Executor, Event, RecurrentEvent
+from src.models import User, Executor
+from src.service import EventService
 
 
 def create_user_and_executor(db_session, name="Default User", role="teacher"):
@@ -81,6 +82,7 @@ def test_cancel_event(event_service, db_session):
     db_session.commit()
 
     assert canceled_event.cancelled is True
+    assert EventService(db_session).events_for_day(date.today(), executor1) == []
 
 
 def test_move_event(event_service, db_session):
@@ -101,7 +103,7 @@ def test_get_events_for_day(event_service, db_session):
     """Ensures the service retrieves all events for a day."""
     user1, executor1 = create_user_and_executor(db_session, "George")
 
-    event_service.add_event(user1, "Art", time(13, 0), time(14, 0), date.today())
+    event_service.add_event(user1, executor1, "Art", time(13, 0), time(14, 0), date.today())
 
     events = event_service.events_for_day(date.today(), user1)
     assert len(events) == 1
@@ -113,11 +115,12 @@ def test_get_available_slots(event_service, db_session):
     user1, executor1 = create_user_and_executor(db_session, "Helen")
 
     # Create an event from 10:00 to 11:00
-    event_service.add_event(user1, "French", time(10, 0), time(11, 0), date.today())
+    event_service.add_event(user1, executor1, "French", time(10, 0), time(11, 0), date.today())
 
     available_slots = event_service.available_slots(executor1, datetime.combine(date.today(), time(9, 0)),
                                                     datetime.combine(date.today(), time(12, 0)), timedelta(minutes=30))
 
+    available_slots = [(s.time(), e.time()) for s, e in available_slots]
     assert len(available_slots) > 0
     assert (time(9, 0), time(9, 30)) in available_slots
     assert (time(9, 30), time(10, 0)) in available_slots

@@ -15,7 +15,7 @@ class EventService:
         filters = {"executor_id": executor.id, "date": day}
         if user:
             filters |= {"user_id": user.id}
-        events: list[Event] = self.db.query(Event).filter_by(**filters).all()
+        events: list[Event] = self.db.query(Event).filter_by(cancelled=False, **filters).all()
 
         filters.pop("date")
 
@@ -36,6 +36,7 @@ class EventService:
             events = self.db.query(Event).filter(
                 Event.executor_id == executor.id,
                 Event.user_id == user.id,
+                Event.cancelled == False,
                 event_time_condition
             ).all()
             recurrent_events = self.db.query(RecurrentEvent).filter(
@@ -45,7 +46,9 @@ class EventService:
                 RecurrentEvent.end <= end,
             ).all()
         else:
-            events = self.db.query(Event).filter(Event.executor_id == executor.id, event_time_condition).all()
+            events = self.db.query(Event).filter(
+                Event.executor_id == executor.id, Event.cancelled == False, event_time_condition
+            ).all()
             recurrent_events = self.db.query(RecurrentEvent).filter(
                 RecurrentEvent.executor_id == executor.id,
                 RecurrentEvent.start >= start,
