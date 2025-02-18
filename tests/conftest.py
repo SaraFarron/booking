@@ -1,7 +1,9 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.models import Base, User  # Import your models
+
+from src.models import Base
+from src.service import EventService
 
 # Use SQLite in-memory database for testing
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -24,3 +26,10 @@ def db_session():
     session.rollback()
     session.close()
     Base.metadata.drop_all(engine)  # Cleanup after test
+
+
+@pytest.fixture
+def event_service(db_session):
+    """Provides an instance of EventService."""
+    return EventService(db_session)
+
