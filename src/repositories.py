@@ -84,6 +84,7 @@ class RecurrentEventRepo(Repository):
         recurrent_event = RecurrentEvent(
             user_id=user.id,
             event_id=event.id,
+            event=event,
             executor_id=executor.id,
             interval=int(interval.total_seconds()),
             start=start,

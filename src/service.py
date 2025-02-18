@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, time
 
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from src.models import Event, User, Executor, RecurrentEvent
 from src.repositories import ExecutorRepo, EventRepo, RecurrentEventRepo
@@ -10,55 +11,53 @@ class EventService:
     def __init__(self, db: Session):
         self.db = db
 
-    def events_for_day(self, day: date, user: User | None = None):
+    def events_for_day(self, day: date, executor: Executor, user: User | None = None):
+        filters = {"executor_id": executor.id, "date": day}
         if user:
-            executor = ExecutorRepo(self.db).get(user.executor_id) if user.executor_id else None
-            if executor:
-                filters = {"executor_id": executor.id, "date": day}
-            else:
-                filters = {"user_id": user.id, "date": day}
-        else:
-            filters = {"date": day}
-        events: list[Event] = self.db.query(Event).filter(**filters).all()
+            filters |= {"user_id": user.id}
+        events: list[Event] = self.db.query(Event).filter_by(**filters).all()
 
         filters.pop("date")
 
         day_start, day_end = datetime.combine(day, datetime.min.time()), datetime.combine(day, datetime.max.time())
-        schedule: list[RecurrentEvent] = self.db.query(RecurrentEvent).filter(**filters).all()
+        schedule: list[RecurrentEvent] = self.db.query(RecurrentEvent).filter_by(**filters).all()
         recurrent_events = []
         for re in schedule:
             if re.get_next_occurrence(day_start, day_end):
                 recurrent_events.append(re)
         return events + recurrent_events
 
-    def events_for_period(self, start: datetime, end: datetime, user: User | None = None):
+    def events_for_period(self, start: datetime, end: datetime, executor: Executor, user: User | None = None):
+        event_time_condition = or_(
+            (Event.date + Event.start_time) >= start,
+            (Event.date + Event.end_time) <= end
+        )
         if user:
-            executor = ExecutorRepo(self.db).get(user.executor_id) if user.executor_id else None
-            if executor:
-                filters = {"executor_id": executor.id}
-            else:
-                filters = {"user_id": user.id}
+            events = self.db.query(Event).filter(
+                Event.executor_id == executor.id,
+                Event.user_id == user.id,
+                event_time_condition
+            ).all()
+            recurrent_events = self.db.query(RecurrentEvent).filter(
+                RecurrentEvent.executor_id == executor.id,
+                RecurrentEvent.user_id == user.id,
+                RecurrentEvent.start >= start,
+                RecurrentEvent.end <= end,
+            ).all()
         else:
-            filters = {}
-
-        events = self.db.query(Event).filter(
-            Event.date >= start.date(),
-            Event.start_time >= start.time(),
-            Event.date <= end.date(),
-            Event.end_time <= end.time(),
-            **filters
-        ).all()
-
-        recurrent_events = self.db.query(RecurrentEvent).filter(
-            RecurrentEvent.start >= start,
-            RecurrentEvent.end <= end,
-        ).all()
+            events = self.db.query(Event).filter(Event.executor_id == executor.id, event_time_condition).all()
+            recurrent_events = self.db.query(RecurrentEvent).filter(
+                RecurrentEvent.executor_id == executor.id,
+                RecurrentEvent.start >= start,
+                RecurrentEvent.end <= end,
+            ).all()
 
         return events + recurrent_events
 
     def add_event(
             self,
             user: User,
+            executor: Executor,
             event_type: str,
             start_time: time,
             end_time: time,
@@ -67,7 +66,8 @@ class EventService:
             start: datetime | None = None,
             end: datetime | None = None
     ):
-        executor = ExecutorRepo(self.db).get(user.executor_id) if user.executor_id else None
+        if not self._slot_is_free(start_time, end_time, day, executor):
+            raise ValueError("Slot is occupied")
         if interval:
             return RecurrentEventRepo(self.db).new(
                 user, executor, event_type, start_time, end_time, day, interval, start, end
@@ -127,6 +127,12 @@ class EventService:
         return [slot for slot in all_slots if not is_occupied(slot)]
 
     def available_slots(self, executor: Executor, start: datetime, end: datetime, slot_size: timedelta):
-        events = self.events_for_period(start, end, executor.user)
+        events = self.events_for_period(start, end, executor)
         busy_slots = [(datetime.combine(e.date, e.start_time), datetime.combine(e.date, e.end_time)) for e in events]
         return self._get_available_slots(start, end, slot_size, busy_slots)
+
+    def _slot_is_free(self, start_time: time, end_time: time, day: date, executor: Executor):
+        start = datetime.combine(day, start_time)
+        end = datetime.combine(day, end_time)
+        events = self.events_for_period(start, end, executor)
+        return not bool(events)
